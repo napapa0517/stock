@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>주식 데일리 브리핑</title>
+  <meta name="description" content="시황 브리핑, 상한가 기록, 자산현황, 종합 브리핑 요청문을 한곳에서 관리하는 1인용 도구">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bd3'/%3E%3Cpath d='M7 22l6-7 5 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="storage-banner" class="banner" hidden>이 브라우저에서는 저장이 되지 않아요. 시크릿 창이면 일반 창에서 열어 주세요.</div>
+
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <h1>주식 데일리 브리핑</h1>
+        <small id="sync-status">자료는 이 브라우저에만 저장돼요</small>
+        <button class="btn small" id="sync-btn" hidden>시트에서 새로고침</button>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="brief" aria-selected="true">오늘의 브리핑</button>
+        <button role="tab" data-tab="search" aria-selected="false">기록·검색</button>
+        <button role="tab" data-tab="asset" aria-selected="false">자산현황</button>
+        <button role="tab" data-tab="source" aria-selected="false">재농·AI 자료</button>
+        <button role="tab" data-tab="data" aria-selected="false">설정·백업</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. 오늘의 브리핑 -->
+    <section id="tab-brief">
+      <div class="toolbar">
+        <select id="date-select" aria-label="날짜"></select>
+        <div class="seg" id="kind-seg" role="group" aria-label="브리핑 종류">
+          <button data-kind="오전">오전</button>
+          <button data-kind="오후">오후</button>
+          <button data-kind="휴장일">휴장일</button>
+          <button data-kind="종합">종합</button>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn" id="copy-btn">카페용 복사</button>
+        <button class="btn local-only" id="edit-btn">수정</button>
+        <button class="btn primary local-only" id="new-brief-btn">새 브리핑</button>
+      </div>
+      <div class="meta" id="brief-meta"></div>
+      <div class="chips" id="mine-chips"></div>
+      <section class="card" id="news-card" hidden>
+        <div class="toolbar" style="margin-bottom:4px">
+          <h2 style="margin:0">주요 뉴스 TOP 20</h2>
+          <span class="muted" id="news-meta"></span>
+          <span class="spacer"></span>
+          <button class="btn small" id="news-toggle" aria-expanded="true">접기</button>
+        </div>
+        <ol class="news" id="news-list"></ol>
+      </section>
+      <div id="brief-host"></div>
+    </section>
+
+    <!-- 2. 기록·검색 -->
+    <section id="tab-search" hidden>
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">상한가 달력</h2>
+          <span class="spacer"></span>
+          <button class="btn small" id="cal-prev" aria-label="이전 달">‹</button>
+          <strong id="cal-title"></strong>
+          <button class="btn small" id="cal-next" aria-label="다음 달">›</button>
+        </div>
+        <div class="cal" id="cal-grid" role="grid"></div>
+        <p class="muted" id="cal-summary"></p>
+      </div>
+      <div class="card">
+        <h2>상한가 기록</h2>
+        <div class="toolbar">
+          <button class="btn small" id="upper-day-prev" aria-label="이전 날짜">‹</button>
+          <select id="upper-date" aria-label="날짜 선택"></select>
+          <button class="btn small" id="upper-day-next" aria-label="다음 날짜">›</button>
+          <input type="search" id="upper-q" placeholder="종목명, 섹터, 사유로 검색" aria-label="상한가 검색">
+          <span class="spacer"></span>
+          <button class="btn local-only" id="upper-paste-btn">시트에서 붙여넣기</button>
+          <button class="btn primary local-only" id="upper-add-btn">상한가 추가</button>
+        </div>
+        <p class="muted" id="upper-summary"></p>
+        <div class="tablewrap"><table id="upper-table"></table></div>
+      </div>
+      <div class="card">
+        <h2>날짜별 브리핑</h2>
+        <div class="toolbar">
+          <input type="search" id="archive-q" placeholder="제목·본문 검색" aria-label="브리핑 검색">
+          <span class="spacer"></span>
+          <button class="btn local-only" id="brief-paste-btn">시트에서 붙여넣기</button>
+        </div>
+        <ul class="list" id="archive-list"></ul>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">누적 기록 (종목분석_누적관리)</h2>
+          <span class="spacer"></span>
+          <div class="seg" id="report-seg" role="group" aria-label="누적 기록 보기">
+            <button data-report="summary" aria-pressed="true">주간·월간·누적 요약</button>
+            <button data-report="calendar" aria-pressed="false">달력 통합</button>
+          </div>
+        </div>
+        <div id="report-host"></div>
+      </div>
+      <div class="card sync-only">
+        <h2>자동 실행 기록 (최근 20건)</h2>
+        <div class="tablewrap"><table id="runs-table"></table></div>
+      </div>
+    </section>
+
+    <!-- 3. 자산현황 -->
+    <section id="tab-asset" hidden>
+      <div class="card">
+        <h2>요약</h2>
+        <div class="stats" id="asset-stats"></div>
+        <div class="bar" id="asset-bar"></div>
+        <div class="legend" id="asset-legend"></div>
+        <p class="muted" id="asset-note"></p>
+      </div>
+      <div class="card">
+        <h2>환율·예수금</h2>
+        <div class="grid2">
+          <label class="field">환율(원/USD)<input type="number" step="0.01" id="fx"></label>
+          <label class="field">예수금(원화)<input type="number" step="1" id="cash-krw"></label>
+          <label class="field">예수금(달러)<input type="number" step="0.01" id="cash-usd"></label>
+          <label class="field">보유 기준<input type="text" id="basis" placeholder="예: 11월 1주 (2026-11-07)"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h2>보유 종목</h2>
+        <div class="toolbar">
+          <span class="muted local-only">현재가는 직접 입력해요. 비워 두면 "미확인"으로 계산에서 빠져요.</span>
+          <span class="muted sync-only">시트에서 불러온 값이에요. 고칠 때는 Google Sheets의 자산_보유·자산_요약 탭을 고치세요.</span>
+          <span class="spacer"></span>
+          <button class="btn local-only" id="hold-paste-btn">시트에서 붙여넣기</button>
+          <button class="btn primary local-only" id="hold-add-btn">종목 추가</button>
+        </div>
+        <div class="tablewrap"><table id="hold-table"></table></div>
+      </div>
+      <div class="card">
+        <h2>주간 기록</h2>
+        <div class="toolbar">
+          <span class="muted">매주 한 번, 지금 자산 상태를 한 줄로 남겨요.</span>
+          <span class="spacer"></span>
+          <button class="btn primary local-only" id="week-add-btn">이번 주 기록 추가</button>
+        </div>
+        <div class="tablewrap"><table id="week-table"></table></div>
+      </div>
+    </section>
+
+    <!-- 4. 재농·AI 자료 -->
+    <section id="tab-source" hidden>
+      <div class="card">
+        <h2>종합 브리핑 만들기</h2>
+        <div class="note sync-only" style="margin-bottom:12px"><strong>시트가 연결되어 있어요</strong>
+          아래에 저장한 재농·AI 자료는 시트 '재농AI자료' 탭에도 저장돼요. Claude 채팅에서 "종합 브리핑 만들어줘"라고만 하면 Claude가 시트의 시황·자산·재농·AI 자료를 읽어 종합 브리핑을 만들고 시트에 저장해요. 다 되면 "시트에서 새로고침"을 누르세요.</div>
+        <p class="muted">시트를 쓰지 않을 때는: 최근 7일 브리핑, 상한가, 자산현황, 최신 재농·AI 자료를 묶은 요청문을 복사해 Claude에 붙여 넣고, 결과를 "새 브리핑"에서 종류 "종합"으로 저장하세요.</p>
+        <div class="toolbar">
+          <label><input type="checkbox" id="req-money" checked> 금액 포함</label>
+          <span class="spacer"></span>
+          <button class="btn primary" id="req-btn">요청문 복사</button>
+        </div>
+        <p class="muted" id="req-info"></p>
+      </div>
+      <div class="card">
+        <h2>재테크농부 스크랩</h2>
+        <div class="toolbar"><span class="spacer"></span><button class="btn primary" data-add-source="재농">스크랩 추가</button></div>
+        <ul class="list" id="src-재농"></ul>
+      </div>
+      <div class="card">
+        <h2>다른 AI 분석</h2>
+        <div class="toolbar"><span class="spacer"></span><button class="btn primary" data-add-source="다른AI">분석 추가</button></div>
+        <ul class="list" id="src-다른AI"></ul>
+      </div>
+    </section>
+
+    <!-- 5. 설정·백업 -->
+    <section id="tab-data" hidden>
+      <div class="card">
+        <h2>Google Sheets 연결</h2>
+        <p class="muted">Apps Script 연결 주소와 비밀 키를 넣으면 시트의 브리핑·상한가·자산현황을 자동으로 불러와요. 비밀 키는 이 브라우저에만 저장되고 백업 파일에는 들어가지 않아요. 설치 방법은 README.md의 "Google Sheets 연결"을 보세요.</p>
+        <div class="grid2">
+          <label class="field">연결 주소(웹 앱 URL)<input type="text" id="conn-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false"></label>
+          <label class="field">비밀 키<input type="password" id="conn-token" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn primary" id="conn-save">연결하고 불러오기</button>
+          <button class="btn danger" id="conn-clear">연결 해제</button>
+        </div>
+        <p class="muted" id="conn-info"></p>
+      </div>
+      <div class="card">
+        <h2>관심 종목</h2>
+        <p class="muted">보유 종목은 자동으로 "내 종목"이 돼요. 보유하지 않았지만 브리핑에서 강조하고 싶은 종목을 쉼표로 적어 주세요.</p>
+        <textarea id="watch" rows="2" placeholder="예: SK하이닉스, 한화에어로스페이스"></textarea>
+      </div>
+      <div class="card">
+        <h2>백업과 복원</h2>
+        <p class="muted">자료는 이 브라우저에만 있어요. 브라우저 기록을 지우거나 다른 PC에서 열면 보이지 않아요. 가끔 백업 파일로 내려받아 두세요.</p>
+        <div class="toolbar">
+          <button class="btn primary" id="export-btn">백업 파일 내려받기</button>
+          <label class="btn">백업 파일 불러오기<input type="file" id="import-file" accept="application/json,.json" hidden></label>
+          <span class="spacer"></span>
+          <button class="btn danger" id="wipe-btn">모든 자료 지우기</button>
+        </div>
+        <p class="muted" id="storage-info"></p>
+      </div>
+      <div class="card">
+        <h2>사용 원칙</h2>
+        <ul>
+          <li>확인되지 않은 수치는 "미확인"으로 적어요. 화면에서 노란색으로 표시돼요.</li>
+          <li>종합 브리핑에는 자산 금액이 있어 카페용 복사 전에 한 번 더 확인해요.</li>
+          <li>현재가는 직접 입력한 값이라 실시간 매매 판단에는 쓰지 않아요.</li>
+          <li>개별 종목 언급은 매수·매도 권유가 아니에요.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- 브리핑 편집 -->
+  <dialog id="brief-dialog">
+    <form method="dialog" id="brief-form">
+      <h2 id="brief-dialog-title">새 브리핑</h2>
+      <div class="grid2">
+        <label class="field">날짜<input type="date" name="date" required></label>
+        <label class="field">종류
+          <select name="kind"><option>오전</option><option>오후</option><option>휴장일</option><option>종합</option></select>
+        </label>
+        <label class="field">생성시각<input type="text" name="created" placeholder="2026-11-04 08:20 KST"></label>
+      </div>
+      <label class="field" style="margin-top:10px">제목<input type="text" name="title" required></label>
+      <label class="field" style="margin-top:10px">본문(마크다운 그대로 붙여넣기)<textarea name="body" rows="14" required></textarea></label>
+      <div class="actions">
+        <button type="button" class="btn danger" id="brief-delete" hidden>삭제</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" value="cancel" data-close>취소</button>
+        <button type="submit" class="btn primary" value="save">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 상한가 추가 -->
+  <dialog id="upper-dialog">
+    <form method="dialog" id="upper-form">
+      <h2>상한가 추가</h2>
+      <div class="grid2">
+        <label class="field">날짜<input type="date" name="date" required></label>
+        <label class="field">시장<select name="market"><option>코스피</option><option>코스닥</option></select></label>
+        <label class="field">종목명<input type="text" name="name" required></label>
+        <label class="field">등락률(%)<input type="text" name="rate" placeholder="29.97"></label>
+        <label class="field">종가(원)<input type="text" name="close"></label>
+        <label class="field">거래대금(억원)<input type="text" name="amount" placeholder="숫자 또는 미확인"></label>
+        <label class="field">섹터<input type="text" name="sector"></label>
+      </div>
+      <label class="field" style="margin-top:10px">사유<input type="text" name="reason" placeholder="근거가 없으면 미확인"></label>
+      <label class="field" style="margin-top:10px">근거 링크<input type="text" name="link" placeholder="https://"></label>
+      <div class="actions">
+        <button type="button" class="btn" data-close>취소</button>
+        <button type="submit" class="btn primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 자료(재농·AI) -->
+  <dialog id="source-dialog">
+    <form method="dialog" id="source-form">
+      <h2 id="source-dialog-title">자료 추가</h2>
+      <input type="hidden" name="type">
+      <div class="grid2">
+        <label class="field">날짜<input type="date" name="date" required></label>
+        <label class="field" id="source-who-label">제목<input type="text" name="title" required></label>
+      </div>
+      <label class="field" style="margin-top:10px">출처(링크) 또는 질문<input type="text" name="source"></label>
+      <label class="field" style="margin-top:10px">내용(붙여넣기)<textarea name="content" rows="12" required></textarea></label>
+      <div class="actions">
+        <button type="button" class="btn danger" id="source-delete" hidden>삭제</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-close>취소</button>
+        <button type="submit" class="btn primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 시트 붙여넣기 -->
+  <dialog id="paste-dialog">
+    <form method="dialog" id="paste-form">
+      <h2 id="paste-title">시트에서 붙여넣기</h2>
+      <p class="muted" id="paste-help"></p>
+      <textarea name="text" rows="12" placeholder="Google Sheets에서 범위를 복사(Ctrl+C)한 뒤 여기에 붙여넣기(Ctrl+V)"></textarea>
+      <div class="actions">
+        <button type="button" class="btn" data-close>취소</button>
+        <button type="submit" class="btn primary">가져오기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
