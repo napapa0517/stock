@@ -18,7 +18,8 @@ function emptyDB() {
     sheetMine: [],   // 시트 내종목 탭의 종목명
     news: [],        // 시트 뉴스 탭: {date, rank, category, title, s1, s2, s3, media, link, published}
     upperHist: [],   // 누적 기록 시트의 상한가 이력(읽기 전용)
-    reports: { summary: [], calendar: [] }   // 누적 기록 시트의 주간월간누적_요약·달력_통합(표시값 그대로)
+    reports: { summary: [], calendar: [] },  // 누적 기록 시트의 주간월간누적_요약·달력_통합(표시값 그대로)
+    images: []       // 브리핑 요약 이미지 목록 {id, date, title, name, savedAt} (그림은 시트 연결로 그때그때 받는다)
   };
 }
 
@@ -261,24 +262,30 @@ function entry(date, kind) {
 }
 function renderBrief() {
   const dates = briefDates();
+  // 달력에서 브리핑 없는 날을 골랐을 수도 있다(이미지만 있는 날 등). 그 날짜는 그대로 둔다.
+  if (!isDate(view.date)) view.date = dates[0] || today();
+  renderBriefCalendar();
+  renderImages();
   const sel = $("date-select");
-  sel.innerHTML = dates.map((d) => `<option value="${esc(d)}">${esc(d)} (${weekday(d)})</option>`).join("") || "<option>브리핑 없음</option>";
-  sel.disabled = !dates.length;
+  const opts = dates.includes(view.date) ? dates : [view.date, ...dates].sort().reverse();
+  sel.innerHTML = opts.map((d) => `<option value="${esc(d)}">${esc(d)} (${weekday(d)})${dates.includes(d) ? "" : " · 브리핑 없음"}</option>`).join("");
+  sel.value = view.date;
   const host = $("brief-host");
-  if (!dates.length) {
+  if (!dates.includes(view.date)) {
     $("brief-meta").innerHTML = "";
     $("mine-chips").innerHTML = "";
     document.querySelectorAll("#kind-seg button").forEach((b) => { b.disabled = true; b.setAttribute("aria-pressed", "false"); });
     $("copy-btn").disabled = true;
     $("edit-btn").disabled = true;
     $("news-card").hidden = true;
-    host.innerHTML = synced()
-      ? `<div class="note"><strong>시트에 브리핑이 아직 없어요</strong>자동 실행이 브리핑을 쓰면 "시트에서 새로고침"으로 불러올 수 있어요.</div>`
-      : `<div class="note"><strong>아직 저장된 브리핑이 없어요</strong>
-      "새 브리핑"을 눌러 Claude가 만든 브리핑을 붙여 넣거나, "기록·검색" 탭의 "시트에서 붙여넣기"로 Google Sheets의 브리핑 탭을 한 번에 가져올 수 있어요. "설정·백업" 탭에서 시트를 연결하면 자동으로 불러와요.</div>`;
+    host.innerHTML = !dates.length && !synced()
+      ? `<div class="note"><strong>아직 저장된 브리핑이 없어요</strong>
+      "새 브리핑"을 눌러 Claude가 만든 브리핑을 붙여 넣거나, "기록·검색" 탭의 "시트에서 붙여넣기"로 Google Sheets의 브리핑 탭을 한 번에 가져올 수 있어요. "설정·백업" 탭에서 시트를 연결하면 자동으로 불러와요.</div>`
+      : `<div class="note"><strong>${esc(view.date)} (${weekday(view.date)})에는 브리핑이 없어요</strong>${dates.length
+        ? "달력에서 점이 찍힌 날을 누르면 그날 브리핑을 볼 수 있어요. 위 요약 이미지 칸에는 이 날짜로 이미지를 올릴 수 있어요."
+        : "자동 실행이 브리핑을 쓰면 \"시트에서 새로고침\"으로 불러올 수 있어요."}</div>`;
     return;
   }
-  if (!view.date || !dates.includes(view.date)) view.date = dates[0];
   const kinds = KINDS.filter((k) => entry(view.date, k));
   if (!kinds.includes(view.kind)) view.kind = kinds[kinds.length - 1];
   sel.value = view.date;
@@ -299,6 +306,155 @@ function renderBrief() {
   $("edit-btn").disabled = false;
   renderNews();
 }
+/* ---------- 브리핑 달력 ---------- */
+const bcal = { month: null };
+const KIND_DOT = { "오전": "k-am", "오후": "k-pm", "휴장일": "k-hol", "종합": "k-all" };
+function renderBriefCalendar() {
+  // 날짜가 바뀌면(날짜 선택·기록 목록·처음 열기) 그 날짜의 달을 보여 준다. 달만 넘길 때는 그대로 둔다.
+  if (!/^\d{4}-\d{2}$/.test(bcal.month || "") || bcal.lastDate !== view.date) bcal.month = (view.date || today()).slice(0, 7);
+  bcal.lastDate = view.date;
+  const [y, m] = bcal.month.split("-").map(Number);
+  $("bcal-title").textContent = `${y}년 ${m}월`;
+  const kindsByDate = {};
+  db.briefings.forEach((b) => { (kindsByDate[b.date] = kindsByDate[b.date] || new Set()).add(b.kind); });
+  const imgsByDate = {};
+  (db.images || []).forEach((im) => { imgsByDate[im.date] = (imgsByDate[im.date] || 0) + 1; });
+  const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const t = today();
+  let html = "일월화수목금토".split("").map((d) => `<div class="dow">${d}</div>`).join("");
+  for (let i = 0; i < first; i++) html += `<button class="day empty" tabindex="-1" aria-hidden="true"></button>`;
+  for (let d = 1; d <= days; d++) {
+    const ds = `${bcal.month}-${String(d).padStart(2, "0")}`;
+    const kinds = kindsByDate[ds] ? KINDS.filter((k) => kindsByDate[ds].has(k)) : [];
+    const imgs = imgsByDate[ds] || 0;
+    const wd = (first + d - 1) % 7;
+    html += `<button class="day${wd === 0 || wd === 6 ? " weekend" : ""}${ds === t ? " today" : ""}" data-bcal-date="${ds}"
+      aria-pressed="${view.date === ds}" aria-label="${m}월 ${d}일${kinds.length ? " 브리핑 " + kinds.join("·") : ""}${imgs ? " 이미지 " + imgs + "장" : ""}">
+      <span class="dnum">${d}</span><span class="marks">${kinds.map((k) => `<i class="kdot ${KIND_DOT[k]}" title="${k}"></i>`).join("")}${imgs ? `<span>🖼${imgs}</span>` : ""}</span></button>`;
+  }
+  $("bcal-grid").innerHTML = html;
+}
+function moveBriefMonth(step) {
+  const [y, m] = bcal.month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + step, 1));
+  bcal.month = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  renderBriefCalendar();
+}
+
+/* ---------- 브리핑 요약 이미지 (Drive 비공개 저장, Apps Script로 주고받음) ---------- */
+const imgCache = {};      // id → object URL (이번 페이지에서만)
+let imgViewing = null;
+function imagesFor(date) { return (db.images || []).filter((im) => im.date === date).sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt))); }
+function renderImages() {
+  const date = view.date;
+  $("img-date").textContent = date ? `${date} (${weekday(date)})` : "";
+  const list = imagesFor(date);
+  const grid = $("img-grid");
+  if (!synced()) {
+    $("img-status").textContent = "요약 이미지는 Google 시트를 연결하면 쓸 수 있어요(설정·백업 탭). 이미지는 Drive 비공개 폴더에 저장돼요.";
+    grid.innerHTML = "";
+    return;
+  }
+  if (!$("img-status").dataset.busy) $("img-status").textContent = list.length ? `${list.length}장 · 누르면 크게 보여요` : "이 날짜에 올린 이미지가 없어요. \"이미지 올리기\"로 여러 장을 한 번에 올릴 수 있어요.";
+  grid.innerHTML = list.map((im) => `<button type="button" class="img-thumb" data-img="${esc(im.id)}" title="${esc(im.title)}">
+      <div class="ph">${imgCache[im.id] ? `<img src="${imgCache[im.id]}" alt="${esc(im.title)}">` : "불러오는 중…"}</div>
+      <div class="cap">${esc(im.title)}</div></button>`).join("");
+  list.filter((im) => !imgCache[im.id]).forEach(loadImage);
+}
+const imgLoading = {};
+async function loadImage(im) {
+  if (imgLoading[im.id]) return imgLoading[im.id];
+  imgLoading[im.id] = (async () => {
+    try {
+      const j = await sheetPost({ action: "getImage", id: im.id });
+      if (!j.image) throw new Error("Apps Script가 이미지 기능을 모르는 예전 버전이에요.");
+      const bin = atob(j.image.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      imgCache[im.id] = URL.createObjectURL(new Blob([bytes], { type: j.image.mime }));
+      const ph = document.querySelector(`[data-img="${CSS.escape(im.id)}"] .ph`);
+      if (ph) ph.innerHTML = `<img src="${imgCache[im.id]}" alt="${esc(im.title)}">`;
+      if (imgViewing === im.id) $("img-dialog-img").src = imgCache[im.id];
+    } catch (e) {
+      const ph = document.querySelector(`[data-img="${CSS.escape(im.id)}"] .ph`);
+      if (ph) ph.textContent = "불러오지 못함";
+      delete imgLoading[im.id];
+    }
+  })();
+  return imgLoading[im.id];
+}
+/* 큰 이미지는 가로 1600px 안으로 줄이고 webp(안 되면 jpeg)로 바꿔 용량을 줄인다 */
+async function compressImage(file) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / bmp.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  let blob = await new Promise((r) => canvas.toBlob(r, "image/webp", 0.88));
+  if (!blob || blob.type !== "image/webp") blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+  if (file.size < blob.size && /^image\/(png|jpeg|webp|gif)$/.test(file.type) && scale === 1) blob = file;
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return { mime: blob.type, data: btoa(bin), url: URL.createObjectURL(blob) };
+}
+async function uploadImages(files) {
+  const date = view.date;
+  if (!synced() || !isDate(date) || !files.length) return;
+  const status = $("img-status");
+  status.dataset.busy = "1";
+  let ok = 0, fail = 0;
+  for (const [i, file] of [...files].entries()) {
+    status.textContent = `${date}에 올리는 중… (${i + 1}/${files.length}) ${file.name}`;
+    try {
+      const c = await compressImage(file);
+      const title = file.name.replace(/\.[^.]+$/, "");
+      const j = await sheetPost({ action: "saveImage", image: { date, title, name: file.name.replace(/\.[^.]+$/, "") + "." + c.mime.split("/")[1], mime: c.mime, data: c.data } });
+      if (!j.image) throw new Error("Apps Script가 이미지 기능을 모르는 예전 버전이에요. 새 버전으로 배포해 주세요.");
+      const im = Object.assign({}, j.image, { date: normDate(j.image.date) });
+      imgCache[im.id] = c.url;
+      db.images = (db.images || []).concat(im);
+      ok++;
+    } catch (e) {
+      fail++;
+      toast(`${file.name}: ${sheetErrorText(e)}`);
+    }
+  }
+  delete status.dataset.busy;
+  save();
+  renderBriefCalendar();
+  renderImages();
+  toast(fail ? `${ok}장 올림, ${fail}장 실패` : `${ok}장을 올렸어요.`);
+}
+function openImage(id) {
+  const im = (db.images || []).find((x) => x.id === id);
+  if (!im) return;
+  imgViewing = id;
+  $("img-dialog-title").textContent = im.title;
+  $("img-dialog-meta").textContent = `${im.date} (${weekday(im.date)})`;
+  $("img-dialog-img").src = imgCache[id] || "";
+  $("img-dialog-img").alt = im.title;
+  if (!imgCache[id]) loadImage(im);
+  $("img-dialog").showModal();
+}
+async function deleteImage() {
+  const im = (db.images || []).find((x) => x.id === imgViewing);
+  if (!im || !confirm(`"${im.title}" 이미지를 지울까요? Drive 파일은 휴지통으로 가요.`)) return;
+  try {
+    await sheetPost({ action: "deleteImage", id: im.id });
+  } catch (e) {
+    toast("지우지 못했어요: " + sheetErrorText(e));
+    return;
+  }
+  db.images = db.images.filter((x) => x.id !== im.id);
+  save();
+  $("img-dialog").close();
+  renderBriefCalendar();
+  renderImages();
+}
+
 /* ---------- 주요 뉴스 TOP 20 ---------- */
 const MEDIA = {
   "etoday.co.kr": "이투데이", "news1.kr": "뉴스1", "yna.co.kr": "연합뉴스", "hankyung.com": "한국경제", "mk.co.kr": "매일경제",
@@ -893,6 +1049,9 @@ function applySheet(d) {
     date: normDate(n.date), rank: Number(n.rank) || 0, category: str(n.category), title: str(n.title),
     s1: str(n.s1), s2: str(n.s2), s3: str(n.s3), media: str(n.media), link: str(n.link), published: normDate(n.published)
   }));
+  db.images = (d.images || []).map((im) => ({
+    id: str(im.id), date: normDate(im.date), title: str(im.title) || str(im.name), name: str(im.name), savedAt: str(im.savedAt)
+  })).filter((im) => im.id && isDate(im.date));
   const rep = d.reports || {};
   db.reports = {
     summary: Array.isArray(rep.summary) ? rep.summary.map((r) => r.map(str)) : [],
@@ -1043,7 +1202,20 @@ function openPaste(mode) {
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
 
-$("date-select").addEventListener("change", (e) => { view.date = e.target.value; renderBrief(); });
+$("date-select").addEventListener("change", (e) => { view.date = e.target.value; bcal.month = view.date.slice(0, 7); renderBrief(); });
+$("bcal-prev").addEventListener("click", () => moveBriefMonth(-1));
+$("bcal-next").addEventListener("click", () => moveBriefMonth(1));
+$("bcal-grid").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-bcal-date]");
+  if (!b) return;
+  view.date = b.dataset.bcalDate;
+  view.kind = null;
+  renderBrief();
+});
+$("img-file").addEventListener("change", (e) => { const f = [...e.target.files]; e.target.value = ""; uploadImages(f); });
+$("img-grid").addEventListener("click", (e) => { const b = e.target.closest("[data-img]"); if (b) openImage(b.dataset.img); });
+$("img-delete").addEventListener("click", deleteImage);
+$("img-dialog").addEventListener("close", () => { imgViewing = null; });
 document.querySelectorAll("#kind-seg button").forEach((b) => b.addEventListener("click", () => { view.kind = b.dataset.kind; renderBrief(); }));
 $("copy-btn").addEventListener("click", copyForCafe);
 $("new-brief-btn").addEventListener("click", () => openBriefDialog(null));

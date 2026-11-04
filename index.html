@@ -31,6 +31,32 @@
   <main>
     <!-- 1. 오늘의 브리핑 -->
     <section id="tab-brief">
+      <div class="brief-top">
+        <section class="card" id="bcal-card">
+          <div class="toolbar">
+            <h2 style="margin:0">브리핑 달력</h2>
+            <span class="spacer"></span>
+            <button class="btn small" id="bcal-prev" aria-label="이전 달">‹</button>
+            <strong id="bcal-title"></strong>
+            <button class="btn small" id="bcal-next" aria-label="다음 달">›</button>
+          </div>
+          <div class="cal bcal" id="bcal-grid" role="grid"></div>
+          <div class="legend" style="margin-top:8px">
+            <span><i class="kdot k-am"></i>오전</span><span><i class="kdot k-pm"></i>오후</span>
+            <span><i class="kdot k-hol"></i>휴장일</span><span><i class="kdot k-all"></i>종합</span><span>🖼 이미지</span>
+          </div>
+        </section>
+        <section class="card" id="img-card">
+          <div class="toolbar">
+            <h2 style="margin:0">요약 이미지</h2>
+            <span class="muted" id="img-date"></span>
+            <span class="spacer"></span>
+            <label class="btn primary sync-only" id="img-upload-btn">이미지 올리기<input type="file" id="img-file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label>
+          </div>
+          <p class="muted" id="img-status"></p>
+          <div class="img-grid" id="img-grid"></div>
+        </section>
+      </div>
       <div class="toolbar">
         <select id="date-select" aria-label="날짜"></select>
         <div class="seg" id="kind-seg" role="group" aria-label="브리핑 종류">
@@ -239,6 +265,20 @@
         <button type="button" class="btn" value="cancel" data-close>취소</button>
         <button type="submit" class="btn primary" value="save">저장</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- 이미지 크게 보기 -->
+  <dialog id="img-dialog" class="img-dialog">
+    <form method="dialog">
+      <div class="toolbar">
+        <strong id="img-dialog-title"></strong>
+        <span class="muted" id="img-dialog-meta"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn small danger" id="img-delete">삭제</button>
+        <button type="button" class="btn small" data-close>닫기</button>
+      </div>
+      <div class="img-view"><img id="img-dialog-img" alt=""></div>
     </form>
   </dialog>
 
