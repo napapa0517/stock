@@ -6,6 +6,13 @@
   <title>주식 데일리 브리핑</title>
   <meta name="description" content="시황 브리핑, 상한가 기록, 자산현황, 종합 브리핑 요청문을 한곳에서 관리하는 1인용 도구">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f5bd3'/%3E%3Cpath d='M7 22l6-7 5 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2f5bd3">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="주식브리핑">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -338,5 +345,13 @@
   </dialog>
 
   <script src="app.js"></script>
+  <script>
+    // 홈 화면 앱(PWA): 화면 파일을 폰에 저장해 두는 서비스 워커 등록
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => { /* 지원 안 되면 그냥 웹으로 동작 */ });
+      });
+    }
+  </script>
 </body>
 </html>
