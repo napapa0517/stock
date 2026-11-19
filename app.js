@@ -19,7 +19,10 @@ function emptyDB() {
     news: [],        // 시트 뉴스 탭: {date, rank, category, title, s1, s2, s3, media, link, published}
     upperHist: [],   // 누적 기록 시트의 상한가 이력(읽기 전용)
     reports: { summary: [], calendar: [] },  // 누적 기록 시트의 주간월간누적_요약·달력_통합(표시값 그대로)
-    images: []       // 브리핑 요약 이미지 목록 {id, date, title, name, savedAt} (그림은 시트 연결로 그때그때 받는다)
+    images: [],      // 브리핑 요약 이미지 목록 {id, date, title, name, savedAt} (그림은 시트 연결로 그때그때 받는다)
+    principles: null, // 시트 '원칙' 탭 최신본 {date, title, body}
+    limits: [],      // 시트 '원칙_기준' 탭 {name, dir: 이상|이하, limit, targets, note}
+    trades: []       // 매매일지 {id, date, account, name, side, qty, price, currency, reason, checks, risk, memo, review, savedAt}
   };
 }
 
@@ -250,6 +253,8 @@ function render() {
   if (currentTab === "search") { renderUpper(); renderReport(); renderArchive(); renderRuns(); }
   if (currentTab === "asset") renderAssets();
   if (currentTab === "source") renderSources();
+  if (currentTab === "rule") renderRules();
+  if (currentTab === "trade") renderTrades();
   if (currentTab === "data") renderData();
 }
 
@@ -952,6 +957,154 @@ async function copyRequest() {
   }
 }
 
+/* ---------- 기준·원칙 ---------- */
+const FIVE = [
+  "기업: EPS 전망이 유지되거나 올라가는 중이다",
+  "가격: 살 가격과 손실 허용액을 미리 적었다",
+  "시장: 신호등이 노랑 이상이다",
+  "비중: 사고 나서도 비중 한도 안에 있다",
+  "현금: 사고 나서도 현금이 30% 위다"
+];
+// 시트가 연결되지 않았을 때 쓰는 기본 기준(종목 이름 없이 공통 규칙만)
+const DEFAULT_LIMITS = [
+  { name: "현금 하한", dir: "이상", limit: 0.3, targets: "현금", note: "어떤 경우에도 이 아래로 내리지 않음" },
+  { name: "단일 종목", dir: "이하", limit: 0.1, targets: "종목별", note: "총자산 대비 한 종목" }
+];
+function limitRatio(v) {
+  const n = num(v);
+  return has(n) ? (n > 1 ? n / 100 : n) : NaN;
+}
+function checkLimits() {
+  const c = calc();
+  const limits = db.limits.length ? db.limits : DEFAULT_LIMITS;
+  return limits.map((l) => {
+    const limit = limitRatio(l.limit);
+    const t = str(l.targets).trim();
+    let value = NaN, detail = "";
+    if (c.total > 0) {
+      if (t === "현금") value = c.cash / c.total;
+      else if (t === "종목별") {
+        const top = [...c.rows].filter((r) => has(r.weight)).sort((a, b) => b.weight - a.weight)[0];
+        if (top) { value = top.weight; detail = "가장 큰 종목: " + top.h.name; }
+      } else {
+        const keys = t.split(/[,\s]+/).map((k) => k.trim().toUpperCase()).filter(Boolean);
+        const hit = c.rows.filter((r) => keys.includes(str(r.h.code).trim().toUpperCase()) || keys.includes(str(r.h.name).trim().toUpperCase()));
+        value = hit.reduce((s, r) => s + (has(r.weight) ? r.weight : 0), 0);
+        detail = hit.length ? hit.map((r) => r.h.name).join("·") : "보유 없음";
+      }
+    }
+    let state = "미확인";
+    if (has(value) && has(limit)) {
+      if (l.dir === "이상") state = value >= limit ? "충족" : "부족";
+      else state = value > limit ? "초과" : value > limit * 0.9 ? "근접" : "충족";
+    }
+    return { l, limit, value, detail, state };
+  });
+}
+function renderRules() {
+  const res = checkLimits();
+  const cls = { 충족: "ok", 근접: "warn", 초과: "bad", 부족: "bad", 미확인: "warn" };
+  $("rule-check").innerHTML = `<thead><tr><th>항목</th><th class="num">한도</th><th class="num">지금</th><th></th><th>상태</th><th>대상·설명</th></tr></thead><tbody>` +
+    res.map(({ l, limit, value, detail, state }) => {
+      const w = has(value) && has(limit) && limit > 0 ? Math.min(100, (value / limit) * 100) : 0;
+      return `<tr><td><strong>${esc(l.name)}</strong></td>
+        <td class="num">${pct(limit, 0)} ${esc(l.dir)}</td>
+        <td class="num">${pct(value)}</td>
+        <td><div class="meter"><span class="${state === "초과" || state === "부족" ? "over" : ""}" style="width:${w}%"></span></div></td>
+        <td><span class="pill ${cls[state]}">${state}</span></td>
+        <td class="muted">${esc(detail || l.targets)}${l.note ? " · " + esc(l.note) : ""}</td></tr>`;
+    }).join("") + "</tbody>";
+  const c = calc();
+  const notes = [];
+  if (!db.holdings.length) notes.push("보유 종목이 없어서 비교할 수 없어요.");
+  if (!db.limits.length) notes.push(synced() ? "시트에 '원칙_기준' 탭이 없거나 Apps Script가 예전 버전이라 기본 기준만 보여 줘요." : "시트를 연결하면 '원칙_기준' 탭의 한도를 불러와요. 지금은 기본 기준만 보여 줘요.");
+  if (c.unknown) notes.push(`현재가 미확인 ${c.unknown}종목은 계산에서 빠졌어요.`);
+  if (db.summary.priceAt) notes.push(`시세 기준: ${db.summary.priceAt}`);
+  const over = res.filter((r) => r.state === "초과" || r.state === "부족").length;
+  const unknownRules = res.filter((r) => r.state === "미확인").length;
+  notes.unshift(over ? `기준을 넘거나 못 미친 항목 ${over}개 — 신규 매수 전에 먼저 맞춰요.`
+    : unknownRules ? "아직 비교할 수 없는 항목이 있어요." : "모든 항목이 기준 안에 있어요.");
+  $("rule-note").textContent = notes.join(" ");
+
+  const box = $("rule-five");
+  if (!box.children.length) box.innerHTML = FIVE.map((t, i) => `<label><input type="checkbox" data-five="${i + 1}"> ${i + 1}. ${esc(t)}</label>`).join("");
+  updateFiveResult();
+
+  const p = db.principles;
+  $("rule-meta").textContent = p ? `${p.title || ""}${p.date ? " · 확정 " + p.date : ""}` : "";
+  $("rule-body").innerHTML = p && p.body ? renderMarkdown(p.body)
+    : `<p class="muted">${synced() ? "시트 '원칙' 탭에 내용이 없거나 Apps Script가 예전 버전이에요." : "원칙 본문은 시트를 연결하면 '원칙' 탭에서 불러와요."}</p>`;
+}
+function fiveChecked(root) {
+  return [...root.querySelectorAll("input[data-five]")].filter((x) => x.checked).map((x) => x.dataset.five);
+}
+function updateFiveResult() {
+  const n = fiveChecked($("rule-five")).length;
+  $("rule-five-result").textContent = n === 5 ? "5 / 5 충족 · 기록을 남기고 분할 매수 검토" : `${n} / 5 충족 · 신규 매수 보류`;
+}
+
+/* ---------- 매매일지 ---------- */
+let editingTradeId = null;
+function tradeChecks(t) { return str(t.checks).split(/[,\s]+/).filter((x) => /^[1-5]$/.test(x)); }
+function renderTrades() {
+  const filter = $("trade-filter").value;
+  const list = [...db.trades].filter((t) => !filter || t.side === filter)
+    .sort((a, b) => (str(b.date) + str(b.savedAt)).localeCompare(str(a.date) + str(a.savedAt)));
+  const month = today().slice(0, 7);
+  const all = db.trades;
+  const buys = all.filter((t) => t.side === "매수");
+  const weak = buys.filter((t) => tradeChecks(t).length < 5).length;
+  const noReview = all.filter((t) => (t.side === "매수" || t.side === "매도" || t.side === "축소") && !str(t.review).trim()).length;
+  const stat = (label, value, cls = "") => `<div class="stat"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+  $("trade-stats").innerHTML =
+    stat("전체 기록", all.length + "건") +
+    stat("이번 달 매수", all.filter((t) => t.side === "매수" && str(t.date).startsWith(month)).length + "건") +
+    stat("이번 달 매도·축소", all.filter((t) => (t.side === "매도" || t.side === "축소") && str(t.date).startsWith(month)).length + "건") +
+    stat("5조건 미충족 매수", weak + "건", weak ? "up" : "") +
+    stat("복기 안 한 기록", noReview + "건");
+  $("trade-table").innerHTML = `<thead><tr><th>날짜</th><th>구분</th><th>종목</th><th>계좌</th><th class="num">수량</th><th class="num">가격</th>
+    <th>5조건</th><th>이유</th><th>복기</th></tr></thead><tbody>` +
+    (list.length ? list.map((t) => {
+      const n = tradeChecks(t).length;
+      const five = t.side === "매수" ? `<span class="pill ${n === 5 ? "ok" : "bad"}">${n}/5</span>` : `<span class="muted">-</span>`;
+      return `<tr data-trade="${esc(t.id)}"><td style="white-space:nowrap">${esc(t.date)}</td><td><span class="pill kind">${esc(t.side)}</span></td>
+        <td><strong>${esc(t.name)}</strong></td><td>${esc(t.account)}</td><td class="num">${esc(t.qty)}</td>
+        <td class="num">${esc(t.price)}${t.price ? (t.currency === "USD" ? " $" : "원") : ""}</td><td>${five}</td>
+        <td class="reason">${esc(str(t.reason).slice(0, 80))}${str(t.reason).length > 80 ? "…" : ""}</td>
+        <td>${str(t.review).trim() ? esc(str(t.review).slice(0, 40)) : '<span class="pill warn">복기 전</span>'}${synced() && !t.savedAt ? ' <span class="pill warn">시트에 아직 없음</span>' : ""}</td></tr>`;
+    }).join("") : `<tr><td colspan="9" class="muted">아직 기록이 없어요. "기록 추가"로 첫 매매를 남겨 보세요.</td></tr>`) + "</tbody>";
+}
+function openTradeDialog(t, preset) {
+  const f = $("trade-form");
+  editingTradeId = t ? t.id : null;
+  $("trade-dialog-title").textContent = t ? "매매 기록 고치기" : "매매 기록 추가";
+  f.date.value = t ? t.date : today();
+  f.side.value = t ? t.side : (preset && preset.side) || "매수";
+  f.name.value = t ? t.name : "";
+  f.account.value = t ? t.account : "";
+  f.qty.value = t ? t.qty : "";
+  f.price.value = t ? t.price : "";
+  f.currency.value = t && t.currency === "USD" ? "USD" : "KRW";
+  f.risk.value = t ? t.risk : "";
+  f.reason.value = t ? t.reason : "";
+  f.memo.value = t ? t.memo : "";
+  f.review.value = t ? t.review : "";
+  const checked = t ? tradeChecks(t) : (preset && preset.checks) || [];
+  $("trade-five").innerHTML = '<legend>5조건 (매수일 때)</legend>' +
+    FIVE.map((x, i) => `<label><input type="checkbox" data-five="${i + 1}"${checked.includes(String(i + 1)) ? " checked" : ""}> ${i + 1}. ${esc(x)}</label>`).join("");
+  const names = [...new Set(db.holdings.map((h) => h.name).concat(db.trades.map((x) => x.name)).filter(Boolean))];
+  $("trade-names").innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
+  const accts = [...new Set(db.holdings.map((h) => h.account).concat(db.trades.map((x) => x.account)).filter(Boolean))];
+  $("trade-accounts").innerHTML = accts.map((n) => `<option value="${esc(n)}">`).join("");
+  $("trade-delete").hidden = !t;
+  $("trade-dialog").showModal();
+}
+async function saveTradeToSheet(t) {
+  const j = await sheetPost({ action: "saveTrade", trade: Object.assign({}, t, { id: t.savedAt ? t.id : "" }) });
+  if (!j.trade) throw new Error("Apps Script가 매매일지 기능을 모르는 예전 버전이에요. 새 버전으로 배포해 주세요.");
+  return Object.assign({}, j.trade, { date: normDate(j.trade.date) });
+}
+
 /* ---------- 5. 설정·백업 ---------- */
 function renderData() {
   $("watch").value = db.watch;
@@ -1057,6 +1210,17 @@ function applySheet(d) {
     summary: Array.isArray(rep.summary) ? rep.summary.map((r) => r.map(str)) : [],
     calendar: Array.isArray(rep.calendar) ? rep.calendar.map((r) => r.map(str)) : []
   };
+  if ("principles" in d) db.principles = d.principles ? { date: normDate(d.principles.date), title: str(d.principles.title), body: str(d.principles.body) } : null;
+  if (Array.isArray(d.limits)) db.limits = d.limits.map((l) => ({ name: str(l.name), dir: l.dir === "이상" ? "이상" : "이하", limit: l.limit, targets: str(l.targets), note: str(l.note) }));
+  if (Array.isArray(d.trades)) {
+    // 시트에 아직 올라가지 않은 기록은 지우지 않고 남긴다
+    const pendingTrades = db.trades.filter((t) => !t.savedAt);
+    db.trades = d.trades.map((t) => ({
+      id: str(t.id), date: normDate(t.date), account: str(t.account), name: str(t.name), side: str(t.side) || "매수",
+      qty: str(t.qty), price: str(t.price), currency: t.currency === "USD" ? "USD" : "KRW", reason: str(t.reason),
+      checks: str(t.checks), risk: str(t.risk), memo: str(t.memo), review: str(t.review), savedAt: str(t.savedAt) || "시트"
+    })).concat(pendingTrades);
+  }
   db.upperHist = (d.upperHistory || []).map((u, i) => ({
     id: "hist:" + i, date: normDate(u.date), market: str(u.market), name: str(u.name), rate: str(u.rate), close: str(u.close),
     amount: str(u.amount), sector: str(u.sector), reason: str(u.reason), link: str(u.link), hist: true
@@ -1114,7 +1278,15 @@ async function syncFromSheet(silent) {
         db.sources = db.sources.map((x) => (x === s ? saved : x));
       } catch (e) { /* 다음 새로고침 때 다시 올린다 */ }
     }
-    if (pending.length) save();
+    // 연결 전(또는 저장 실패 때) 남긴 매매일지를 시트로 올린다
+    const pendingTrades = Array.isArray(j.data.trades) ? db.trades.filter((t) => !t.savedAt) : [];
+    for (const t of pendingTrades) {
+      try {
+        const saved = await saveTradeToSheet(t);
+        db.trades = db.trades.map((x) => (x === t ? saved : x));
+      } catch (e) { /* 다음 새로고침 때 다시 올린다 */ }
+    }
+    if (pending.length || pendingTrades.length) save();
     conn.lastSync = j.at || nowText();
     saveConn();
     save();
@@ -1368,6 +1540,63 @@ $("source-delete").addEventListener("click", async () => {
   renderSources();
 });
 $("req-btn").addEventListener("click", copyRequest);
+
+/* 기준·원칙 */
+$("rule-five").addEventListener("change", updateFiveResult);
+$("rule-to-trade").addEventListener("click", () => openTradeDialog(null, { side: "매수", checks: fiveChecked($("rule-five")) }));
+
+/* 매매일지 */
+$("trade-filter").addEventListener("change", renderTrades);
+$("trade-add-btn").addEventListener("click", () => openTradeDialog(null));
+$("trade-table").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-trade]");
+  if (tr) openTradeDialog(db.trades.find((t) => t.id === tr.dataset.trade));
+});
+$("trade-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const data = {
+    date: f.date.value, side: f.side.value, name: f.name.value.trim(), account: f.account.value.trim(),
+    qty: f.qty.value.trim(), price: f.price.value.replace(/,/g, "").trim(), currency: f.currency.value,
+    checks: fiveChecked($("trade-five")).join(","), risk: f.risk.value.trim(),
+    reason: f.reason.value.trim(), memo: f.memo.value.trim(), review: f.review.value.trim()
+  };
+  if (data.side === "매수" && tradeChecks(data).length < 5 && !editingTradeId &&
+    !confirm(`5조건 중 ${tradeChecks(data).length}개만 체크됐어요. 원칙상 매수 보류예요. 그래도 기록할까요?`)) return;
+  const item = editingTradeId ? Object.assign(db.trades.find((t) => t.id === editingTradeId), data) : { id: uid(), ...data };
+  if (!editingTradeId) db.trades.push(item);
+  save();
+  if (synced()) {
+    const btn = f.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = "시트에 저장 중…";
+    try {
+      const saved = await saveTradeToSheet(item);
+      db.trades = db.trades.map((x) => (x === item ? saved : x));
+      save();
+      toast("매매일지를 시트에 저장했어요.");
+    } catch (err) {
+      toast("이 브라우저에는 저장했지만 시트에는 못 올렸어요: " + sheetErrorText(err) + " 다음 새로고침 때 다시 올려요.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "저장";
+    }
+  } else toast("이 브라우저에 저장했어요.");
+  $("trade-dialog").close();
+  renderTrades();
+});
+$("trade-delete").addEventListener("click", async () => {
+  const t = db.trades.find((x) => x.id === editingTradeId);
+  if (!t || !confirm(synced() && t.savedAt ? "이 기록을 지울까요? 시트에서도 지워져요." : "이 기록을 지울까요?")) return;
+  if (synced() && t.savedAt) {
+    try { await sheetPost({ action: "deleteTrade", id: t.id }); }
+    catch (err) { toast("시트에서 지우지 못했어요: " + sheetErrorText(err)); return; }
+  }
+  db.trades = db.trades.filter((x) => x.id !== t.id);
+  save();
+  $("trade-dialog").close();
+  renderTrades();
+});
 
 $("watch").addEventListener("change", (e) => { db.watch = e.target.value; save(); });
 $("sync-btn").addEventListener("click", () => syncFromSheet(false));

@@ -30,6 +30,8 @@
         <button role="tab" data-tab="search" aria-selected="false">기록·검색</button>
         <button role="tab" data-tab="asset" aria-selected="false">자산현황</button>
         <button role="tab" data-tab="source" aria-selected="false">재농·AI 자료</button>
+        <button role="tab" data-tab="rule" aria-selected="false">기준·원칙</button>
+        <button role="tab" data-tab="trade" aria-selected="false">매매일지</button>
         <button role="tab" data-tab="data" aria-selected="false">설정·백업</button>
       </nav>
     </div>
@@ -210,6 +212,47 @@
       </div>
     </section>
 
+    <!-- 기준·원칙 -->
+    <section id="tab-rule" hidden>
+      <div class="card">
+        <h2>지금 내 계좌 점검</h2>
+        <p class="muted">자산현황의 보유 종목·예수금을 시트 '원칙_기준' 탭의 한도와 비교해요. 한도를 바꾸려면 그 탭을 고치세요.</p>
+        <div class="tablewrap"><table id="rule-check"></table></div>
+        <p class="muted" id="rule-note"></p>
+      </div>
+      <div class="card">
+        <h2>신규 매수 전 5조건</h2>
+        <p class="muted">다섯 개가 모두 체크돼야 매수해요. 체크는 저장되지 않아요(매매일지에 기록할 때 같이 남겨요).</p>
+        <div class="five" id="rule-five"></div>
+        <div class="toolbar" style="margin-top:10px">
+          <strong id="rule-five-result"></strong>
+          <span class="spacer"></span>
+          <button class="btn primary" id="rule-to-trade">이 체크로 매매일지 쓰기</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toolbar"><h2 style="margin:0">내 원칙</h2><span class="muted" id="rule-meta"></span></div>
+        <div class="md" id="rule-body"></div>
+      </div>
+    </section>
+
+    <!-- 매매일지 -->
+    <section id="tab-trade" hidden>
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">매매일지</h2>
+          <span class="spacer"></span>
+          <select id="trade-filter" aria-label="구분 보기">
+            <option value="">전체</option><option>매수</option><option>매도</option><option>축소</option><option>관찰</option>
+          </select>
+          <button class="btn primary" id="trade-add-btn">기록 추가</button>
+        </div>
+        <div class="stats" id="trade-stats"></div>
+        <p class="muted" style="margin-top:10px">사고팔 때마다 이유와 5조건을 남기고, 나중에 "복기"를 채워요. 줄을 누르면 고칠 수 있어요.</p>
+        <div class="tablewrap"><table id="trade-table"></table></div>
+      </div>
+    </section>
+
     <!-- 5. 설정·백업 -->
     <section id="tab-data" hidden>
       <div class="card">
@@ -324,6 +367,35 @@
       <label class="field" style="margin-top:10px">내용(붙여넣기)<textarea name="content" rows="12" required></textarea></label>
       <div class="actions">
         <button type="button" class="btn danger" id="source-delete" hidden>삭제</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-close>취소</button>
+        <button type="submit" class="btn primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 매매일지 기록 -->
+  <dialog id="trade-dialog">
+    <form method="dialog" id="trade-form">
+      <h2 id="trade-dialog-title">매매 기록</h2>
+      <div class="grid2">
+        <label class="field">날짜<input type="date" name="date" required></label>
+        <label class="field">구분<select name="side"><option>매수</option><option>매도</option><option>축소</option><option>관찰</option></select></label>
+        <label class="field">종목<input type="text" name="name" list="trade-names" required></label>
+        <label class="field">계좌<input type="text" name="account" list="trade-accounts" placeholder="예: 스윙장투"></label>
+        <label class="field">수량<input type="text" name="qty" inputmode="decimal"></label>
+        <label class="field">가격<input type="text" name="price" inputmode="decimal"></label>
+        <label class="field">통화<select name="currency"><option>KRW</option><option>USD</option></select></label>
+        <label class="field">손실 허용·손절선<input type="text" name="risk" placeholder="예: -10% 또는 20만원"></label>
+      </div>
+      <datalist id="trade-names"></datalist>
+      <datalist id="trade-accounts"></datalist>
+      <fieldset class="five" id="trade-five" style="margin-top:10px"><legend>5조건 (매수일 때)</legend></fieldset>
+      <label class="field" style="margin-top:10px">이유(투자논리)<textarea name="reason" rows="3" required placeholder="왜 사고/파는지, 어떤 조건이 되면 판단을 바꿀지"></textarea></label>
+      <label class="field" style="margin-top:10px">메모(감정·상황)<textarea name="memo" rows="2" placeholder="예: 급등 보고 조급했음, 실적 확인 후"></textarea></label>
+      <label class="field" style="margin-top:10px">복기(나중에)<textarea name="review" rows="2" placeholder="결과와 배운 점"></textarea></label>
+      <div class="actions">
+        <button type="button" class="btn danger" id="trade-delete" hidden>삭제</button>
         <span style="flex:1"></span>
         <button type="button" class="btn" data-close>취소</button>
         <button type="submit" class="btn primary">저장</button>

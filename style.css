@@ -234,6 +234,20 @@ dialog.img-dialog form { padding: 12px; }
 .list .sub { font-size: 13px; color: var(--muted); }
 .linkbtn { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; text-align: left; }
 
+/* 기준·원칙, 매매일지 */
+.five { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; }
+.five legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.five label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--text); cursor: pointer; }
+.five label input { margin-top: 3px; }
+.pill.bad { background: #fde2e2; color: #a52222; }
+@media (prefers-color-scheme: dark) { .pill.bad { background: #4a1f1f; color: #ff9b94; } }
+#trade-table tbody tr { cursor: pointer; }
+#trade-table td { white-space: nowrap; }
+#trade-table td.reason { white-space: normal; min-width: 220px; max-width: 420px; }
+.meter { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.meter > span { display: block; height: 100%; background: var(--accent); }
+.meter > span.over { background: var(--up); }
+
 /* dialog */
 dialog {
   border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(760px, calc(100vw - 32px));
