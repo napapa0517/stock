@@ -239,6 +239,7 @@ dialog.img-dialog form { padding: 12px; }
 .five legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
 .five label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--text); cursor: pointer; }
 .five label input { margin-top: 3px; }
+.pill { white-space: nowrap; }
 .pill.bad { background: #fde2e2; color: #a52222; }
 @media (prefers-color-scheme: dark) { .pill.bad { background: #4a1f1f; color: #ff9b94; } }
 #trade-table tbody tr { cursor: pointer; }
