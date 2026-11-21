@@ -337,3 +337,20 @@ body:not(.synced) .sync-only { display: none !important; }
 .mt-band { position: absolute; top: -3px; bottom: -3px; border: 2px solid var(--text); border-radius: 4px; background: transparent; }
 .mt-ok { color: #2f8a4f; } .mt-bad { color: var(--danger); }
 .mt-note { margin-top: 3px; }
+/* 등락 막대 */
+.bx-title { margin-bottom: 6px; }
+.bx { display: grid; grid-template-columns: minmax(90px, 150px) 1fr 74px; gap: 8px; align-items: center; padding: 3px 0; font-size: 14px; }
+.bx-track { display: flex; height: 14px; }
+.bx-half { flex: 1; display: flex; }
+.bx-half.l { justify-content: flex-end; border-right: 1px solid var(--muted); }
+.bx-half.r { justify-content: flex-start; }
+.bx-half.full { flex: 1; border: 0; }
+.bx-bar { display: block; height: 100%; border-radius: 3px; }
+.bx-bar.up { background: var(--up); } .bx-bar.dn { background: var(--down); } .bx-bar.plain { background: var(--accent); }
+.bx-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.bx-val.up { color: var(--up); } .bx-val.dn { color: var(--down); }
+.bx-note { grid-column: 1 / -1; font-size: 12px; margin: -2px 0 2px; }
+/* 구성 막대 */
+.st-bar { height: 30px; }
+.st-c0 { background: #3a9d5d; } .st-c1 { background: #2f5bd3; } .st-c2 { background: #8a5cd0; }
+.st-c3 { background: #d99a1e; } .st-c4 { background: #d24b4b; } .st-c5 { background: #6b6862; }

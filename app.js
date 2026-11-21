@@ -265,6 +265,35 @@ const VIZ = {
     });
     return `<div class="viz lvs"><div class="lv-title"><strong>${inline(title)}</strong> <span class="muted">위는 저항, 아래는 지지 · 막대는 지금 값과의 거리</span></div>${items.join("")}</div>`;
   },
+  // 첫 줄(선택) "@ 제목 | 단위 | plain", 그 뒤 이름 | 값 | 메모. 기본은 +빨강/-파랑, plain이면 한 색
+  bars(rows) {
+    let title = "", unit = "%", plain = false;
+    if (rows[0] && /^@/.test(rows[0][0])) { title = rows[0][0].replace(/^@\s*/, ""); unit = rows[0][1] ?? "%"; plain = rows[0][2] === "plain"; rows = rows.slice(1); }
+    const bs = rows.filter((r) => numOf(r[1]) !== null).map(([name, v, note]) => ({ name, v: numOf(v), raw: String(v).replace(/^\+/, ""), note }));
+    if (!bs.length) return "";
+    const max = Math.max(...bs.map((b) => Math.abs(b.v))) || 1;
+    const neg = !plain && bs.some((b) => b.v < 0), pos = plain || bs.some((b) => b.v > 0);
+    const items = bs.map((b) => {
+      const w = ((Math.abs(b.v) / max) * 100).toFixed(1);
+      const cls = plain ? "plain" : b.v < 0 ? "dn" : "up";
+      const val = `${!plain && b.v > 0 ? "+" : ""}${esc(b.raw)}${esc(unit)}`;
+      const bar = `<span class="bx-bar ${cls}" style="width:${w}%"></span>`;
+      const track = neg && pos ? `<span class="bx-half l">${b.v < 0 ? bar : ""}</span><span class="bx-half r">${b.v >= 0 ? bar : ""}</span>` : `<span class="bx-half ${neg ? "l" : "r"} full">${bar}</span>`;
+      return `<div class="bx"><span class="bx-name">${inline(b.name)}</span><span class="bx-track">${track}</span><span class="bx-val ${cls}">${val}</span>${b.note ? `<span class="bx-note muted">${inline(b.note)}</span>` : ""}</div>`;
+    });
+    return `<div class="viz bxs">${title ? `<div class="bx-title"><strong>${inline(title)}</strong></div>` : ""}${items.join("")}</div>`;
+  },
+  // 첫 줄(선택) "@ 제목", 그 뒤 이름 | 값(비율·금액 아무거나) — 합계 대비 비율 막대
+  stack(rows) {
+    let title = "";
+    if (rows[0] && /^@/.test(rows[0][0])) { title = rows[0][0].replace(/^@\s*/, ""); rows = rows.slice(1); }
+    const ss = rows.filter((r) => numOf(r[1]) !== null && numOf(r[1]) > 0).map(([name, v, note]) => ({ name, v: numOf(v), note }));
+    const sum = ss.reduce((a, s) => a + s.v, 0);
+    if (!sum) return "";
+    const seg = ss.map((s, k) => { const p = (s.v / sum) * 100; return `<span class="st-c${k % 6}" style="width:${p.toFixed(2)}%" title="${esc(s.name)} ${p.toFixed(1)}%">${p >= 9 ? p.toFixed(1) + "%" : ""}</span>`; }).join("");
+    const legend = ss.map((s, k) => `<span><i class="sc-dot st-c${k % 6}"></i>${inline(s.name)} <strong>${((s.v / sum) * 100).toFixed(1)}%</strong>${s.note ? ` <span class="muted">${inline(s.note)}</span>` : ""}</span>`).join("");
+    return `<div class="viz st">${title ? `<div class="bx-title"><strong>${inline(title)}</strong></div>` : ""}<div class="sc-bar st-bar">${seg}</div><div class="sc-legend">${legend}</div></div>`;
+  },
   // 이름 | 지금% | 기준(15 또는 50~60) | 이하·이상·목표 | 메모
   meter(rows) {
     const ms = rows.filter((r) => r.length >= 3 && numOf(r[1]) !== null).map(([name, v, lim, dir, note]) => {
