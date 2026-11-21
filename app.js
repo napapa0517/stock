@@ -21,6 +21,7 @@ function emptyDB() {
     reports: { summary: [], calendar: [] },  // 누적 기록 시트의 주간월간누적_요약·달력_통합(표시값 그대로)
     images: [],      // 브리핑 요약 이미지 목록 {id, date, title, name, savedAt} (그림은 시트 연결로 그때그때 받는다)
     principles: null, // 시트 '원칙' 탭 최신본 {date, title, body}
+    outlooks: [],    // 시트 '전망' 탭 {date, basis, title, body, savedAt}
     limits: [],      // 시트 '원칙_기준' 탭 {name, dir: 이상|이하, limit, targets, note}
     trades: []       // 매매일지 {id, date, account, name, side, qty, price, currency, reason, checks, risk, memo, review, savedAt}
   };
@@ -253,6 +254,7 @@ function render() {
   if (currentTab === "search") { renderUpper(); renderReport(); renderArchive(); renderRuns(); }
   if (currentTab === "asset") renderAssets();
   if (currentTab === "source") renderSources();
+  if (currentTab === "outlook") renderOutlook();
   if (currentTab === "rule") renderRules();
   if (currentTab === "trade") renderTrades();
   if (currentTab === "data") renderData();
@@ -1001,6 +1003,27 @@ function checkLimits() {
     return { l, limit, value, detail, state };
   });
 }
+/* ---------- 시장 전망 ---------- */
+let outlookPick = null;
+function renderOutlook() {
+  const list = [...(db.outlooks || [])].sort((a, b) => (b.date + b.savedAt).localeCompare(a.date + a.savedAt));
+  const sel = $("outlook-select");
+  if (!list.length) {
+    sel.innerHTML = "";
+    sel.hidden = true;
+    $("outlook-meta").textContent = "";
+    $("outlook-body").innerHTML = `<p class="muted">${synced() ? "시트에 '전망' 탭이 없거나 Apps Script가 예전 버전이에요. 종합 브리핑을 만들 때 전망을 같이 저장해요." : "시트를 연결하면 '전망' 탭의 시장 전망을 불러와요."}</p>`;
+    return;
+  }
+  sel.hidden = list.length < 2;
+  const key = (o) => o.date + "|" + o.savedAt;
+  if (!outlookPick || !list.some((o) => key(o) === outlookPick)) outlookPick = key(list[0]);
+  sel.innerHTML = list.map((o, i) => `<option value="${esc(key(o))}">${esc(o.date)}${i === 0 ? " (최신)" : ""}</option>`).join("");
+  sel.value = outlookPick;
+  const o = list.find((x) => key(x) === outlookPick);
+  $("outlook-meta").textContent = [o.title, o.basis ? "기준: " + o.basis : "", o.savedAt ? "저장 " + o.savedAt : ""].filter(Boolean).join(" · ");
+  $("outlook-body").innerHTML = renderMarkdown(o.body);
+}
 function renderRules() {
   const res = checkLimits();
   const cls = { 충족: "ok", 근접: "warn", 초과: "bad", 부족: "bad", 미확인: "warn" };
@@ -1211,6 +1234,9 @@ function applySheet(d) {
     calendar: Array.isArray(rep.calendar) ? rep.calendar.map((r) => r.map(str)) : []
   };
   if ("principles" in d) db.principles = d.principles ? { date: normDate(d.principles.date), title: str(d.principles.title), body: str(d.principles.body) } : null;
+  if (Array.isArray(d.outlooks)) db.outlooks = d.outlooks.map((o) => ({
+    date: normDate(o.date), basis: str(o.basis), title: str(o.title), body: str(o.body), savedAt: str(o.savedAt)
+  })).filter((o) => o.body.trim());
   if (Array.isArray(d.limits)) db.limits = d.limits.map((l) => ({ name: str(l.name), dir: l.dir === "이상" ? "이상" : "이하", limit: l.limit, targets: str(l.targets), note: str(l.note) }));
   if (Array.isArray(d.trades)) {
     // 시트에 아직 올라가지 않은 기록은 지우지 않고 남긴다
@@ -1372,6 +1398,7 @@ function openPaste(mode) {
 
 /* ---------- 이벤트 ---------- */
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+$("outlook-select").addEventListener("change", (e) => { outlookPick = e.target.value; renderOutlook(); });
 document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
 
 $("date-select").addEventListener("change", (e) => { view.date = e.target.value; bcal.month = view.date.slice(0, 7); renderBrief(); });

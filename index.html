@@ -30,6 +30,7 @@
         <button role="tab" data-tab="search" aria-selected="false">기록·검색</button>
         <button role="tab" data-tab="asset" aria-selected="false">자산현황</button>
         <button role="tab" data-tab="source" aria-selected="false">재농·AI 자료</button>
+        <button role="tab" data-tab="outlook" aria-selected="false">시장 전망</button>
         <button role="tab" data-tab="rule" aria-selected="false">기준·원칙</button>
         <button role="tab" data-tab="trade" aria-selected="false">매매일지</button>
         <button role="tab" data-tab="data" aria-selected="false">설정·백업</button>
@@ -209,6 +210,19 @@
         <h2>다른 AI 분석</h2>
         <div class="toolbar"><span class="spacer"></span><button class="btn primary" data-add-source="다른AI">분석 추가</button></div>
         <ul class="list" id="src-다른AI"></ul>
+      </div>
+    </section>
+
+    <!-- 시장 전망 -->
+    <section id="tab-outlook" hidden>
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">시장 전망</h2>
+          <span class="spacer"></span>
+          <select id="outlook-select" aria-label="전망 날짜 고르기"></select>
+        </div>
+        <p class="muted" id="outlook-meta"></p>
+        <div class="md" id="outlook-body"></div>
       </div>
     </section>
 
