@@ -283,3 +283,57 @@ body:not(.synced) .sync-only { display: none !important; }
   .top, .toolbar, .btn { display: none !important; }
   body { background: #fff; }
 }
+
+/* ---------- 시장 전망 그림 블록 ---------- */
+.viz { margin: 12px 0 16px; }
+.viz .muted { font-size: 12px; }
+/* 단기·중기·장기 카드 */
+.hz { display: flex; align-items: stretch; gap: 6px; }
+.hz-card { flex: 1; min-width: 0; background: var(--surface-2); border-radius: var(--radius); padding: 12px; border-top: 4px solid var(--muted); }
+.hz-card p { margin: 8px 0 0; font-size: 14px; }
+.hz-top { display: flex; gap: 10px; align-items: center; }
+.hz-arrow { font-size: 28px; line-height: 1; font-weight: 700; }
+.hz-down { border-top-color: var(--down); } .hz-down .hz-arrow { color: var(--down); }
+.hz-up { border-top-color: var(--up); } .hz-up .hz-arrow { color: var(--up); }
+.hz-mixed { border-top-color: var(--warn-text); } .hz-mixed .hz-arrow { color: var(--warn-text); }
+.hz-link { align-self: center; color: var(--muted); font-size: 22px; }
+@media (max-width: 640px) { .hz { flex-direction: column; } .hz-link { transform: rotate(90deg); } }
+/* 신호등 */
+.sigs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.sig { display: flex; gap: 10px; align-items: center; background: var(--surface-2); border-radius: var(--radius); padding: 10px; }
+.sig-lamps { display: flex; flex-direction: column; gap: 3px; background: #2a2a2a; padding: 4px; border-radius: 8px; }
+.lamp { width: 13px; height: 13px; border-radius: 50%; display: block; opacity: 0.18; }
+.lamp.red { background: #ff4d4d; } .lamp.yellow { background: #ffc531; } .lamp.green { background: #3ccf6e; }
+.lamp.on { opacity: 1; box-shadow: 0 0 6px currentColor; }
+.sig-cond { font-size: 13px; color: var(--muted); margin-top: 2px; }
+/* 시나리오 막대 */
+.sc-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.sc-lab { width: 44px; flex: none; font-size: 13px; }
+.sc-bar { flex: 1; display: flex; height: 26px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.sc-bar span { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; }
+.sc-good { background: #3a9d5d; } .sc-warn { background: #d99a1e; } .sc-bad { background: #d24b4b; }
+.sc-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 14px; }
+.sc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+/* 지지·저항 사다리 */
+.lvs { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.lv-title { margin-bottom: 6px; }
+.lv { display: grid; grid-template-columns: 82px 1fr 120px; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px dashed var(--line); font-size: 14px; }
+.lv-v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.lv-resistance .lv-v { color: var(--up); } .lv-support .lv-v { color: var(--down); }
+.lv-now { background: var(--accent-soft); border-radius: 6px; border-top-color: transparent; padding: 7px 0; }
+.lv-now .lv-v { color: var(--accent); }
+.lv-gap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lv-track { flex: 1; height: 5px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.lv-track span { display: block; height: 100%; }
+.lv-resistance .lv-track span { background: var(--up); } .lv-support .lv-track span { background: var(--down); }
+@media (max-width: 520px) { .lv { grid-template-columns: 70px 1fr; } .lv-gap { grid-column: 2; } }
+/* 비중 게이지 */
+.mts { display: grid; gap: 12px; }
+.mt-head { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-bottom: 4px; }
+.mt-track { position: relative; height: 12px; background: var(--surface-2); border-radius: 6px; }
+.mt-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
+.mt-fill.ok { background: #3a9d5d; } .mt-fill.bad { background: #d24b4b; }
+.mt-line { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
+.mt-band { position: absolute; top: -3px; bottom: -3px; border: 2px solid var(--text); border-radius: 4px; background: transparent; }
+.mt-ok { color: #2f8a4f; } .mt-bad { color: var(--danger); }
+.mt-note { margin-top: 3px; }

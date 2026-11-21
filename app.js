@@ -156,8 +156,10 @@ function renderMarkdown(md) {
       const buf = [];
       i++;
       while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+      const lang = line.replace(/^```/, "").trim().toLowerCase();
       i++;
-      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      const viz = VIZ[lang] ? renderViz(lang, buf) : "";
+      out.push(viz || `<pre><code>${esc(buf.join("\n"))}</code></pre>`);
       continue;
     }
     const h = line.match(/^(#{1,4})\s+(.*)$/);
@@ -207,6 +209,85 @@ function renderMarkdown(md) {
     out.push(`<p>${buf.map(inline).join("<br>")}</p>`);
   }
   return out.join("\n");
+}
+
+/* ---------- 그림 블록: ```horizon / signals / scenario / levels / meter ----------
+   줄마다 "|"로 칸을 나눈다. 숫자가 아니거나 칸이 모자라면 그 줄은 건너뛴다. */
+const numOf = (s) => { const n = parseFloat(String(s || "").replace(/[,%\s]/g, "")); return Number.isFinite(n) ? n : null; };
+const fmtNum = (n) => n.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+const VIZ = {
+  // 이름 | 기간 | 방향(up·flat·down·mixed) | 한 줄
+  horizon(rows) {
+    const arrow = { up: "↗", flat: "→", down: "↘", mixed: "↔" };
+    const cards = rows.filter((r) => r.length >= 3).map(([name, period, dir, text]) => {
+      const d = arrow[dir] ? dir : "flat";
+      return `<div class="hz-card hz-${d}"><div class="hz-top"><span class="hz-arrow">${arrow[d]}</span><div><strong>${inline(name)}</strong><div class="muted">${inline(period)}</div></div></div><p>${inline(text || "")}</p></div>`;
+    });
+    return cards.length ? `<div class="viz hz">${cards.join('<span class="hz-link" aria-hidden="true">›</span>')}</div>` : "";
+  },
+  // 이름 | red·yellow·green | 상태 | 조건
+  signals(rows) {
+    const items = rows.filter((r) => r.length >= 2).map(([name, color, state, cond]) => {
+      const c = ["red", "yellow", "green"].includes(color) ? color : "yellow";
+      const lamp = ["red", "yellow", "green"].map((k) => `<i class="lamp ${k}${k === c ? " on" : ""}"></i>`).join("");
+      return `<div class="sig"><div class="sig-lamps" role="img" aria-label="${esc(name)} ${esc(state || c)}">${lamp}</div><div><strong>${inline(name)}</strong> <span class="muted">${inline(state || "")}</span><div class="sig-cond">${inline(cond || "")}</div></div></div>`;
+    });
+    return items.length ? `<div class="viz sigs">${items.join("")}</div>` : "";
+  },
+  // 첫 줄 "@ 이전이름 | 지금이름", 그 뒤 이름 | 이전% | 지금% | good·warn·bad
+  scenario(rows) {
+    let labels = ["이전", "지금"];
+    if (rows[0] && /^@/.test(rows[0][0])) { labels = [rows[0][0].replace(/^@\s*/, ""), rows[0][1] || "지금"]; rows = rows.slice(1); }
+    const sc = rows.filter((r) => r.length >= 3 && numOf(r[1]) !== null && numOf(r[2]) !== null)
+      .map(([name, a, b, tone]) => ({ name, a: numOf(a), b: numOf(b), tone: ["good", "warn", "bad"].includes(tone) ? tone : "warn" }));
+    if (!sc.length) return "";
+    const bar = (key) => `<div class="sc-bar">${sc.map((s) => s[key] > 0 ? `<span class="sc-${s.tone}" style="width:${s[key]}%" title="${esc(s.name)} ${s[key]}%">${s[key] >= 8 ? s[key] + "%" : ""}</span>` : "").join("")}</div>`;
+    const legend = sc.map((s) => {
+      const d = s.b - s.a;
+      return `<span><i class="sc-dot sc-${s.tone}"></i>${inline(s.name)} <strong>${s.b}%</strong> <span class="muted">(${d > 0 ? "+" : ""}${d}%p)</span></span>`;
+    }).join("");
+    return `<div class="viz sc"><div class="sc-row"><span class="sc-lab muted">${esc(labels[0])}</span>${bar("a")}</div><div class="sc-row"><span class="sc-lab"><strong>${esc(labels[1])}</strong></span>${bar("b")}</div><div class="sc-legend">${legend}</div></div>`;
+  },
+  // 첫 줄 "@ 이름 | 현재값", 그 뒤 값 | 설명 | resistance·support
+  levels(rows) {
+    if (!rows[0] || !/^@/.test(rows[0][0])) return "";
+    const title = rows[0][0].replace(/^@\s*/, ""), now = numOf(rows[0][1]);
+    if (now === null) return "";
+    const lv = rows.slice(1).filter((r) => numOf(r[0]) !== null).map(([v, label, kind]) => ({ v: numOf(v), label, kind: kind === "support" ? "support" : "resistance" }));
+    lv.push({ v: now, label: "지금", kind: "now" });
+    lv.sort((a, b) => b.v - a.v);
+    const span = Math.max(...lv.map((l) => Math.abs(l.v / now - 1))) || 1;
+    const items = lv.map((l) => {
+      const gap = (l.v / now - 1) * 100;
+      const w = Math.round((Math.abs(l.v / now - 1) / span) * 100);
+      return `<div class="lv lv-${l.kind}"><span class="lv-v">${fmtNum(l.v)}</span><span class="lv-label">${inline(l.label || "")}</span>` +
+        (l.kind === "now" ? `<span class="lv-gap"><strong>현재</strong></span>` : `<span class="lv-gap"><span class="lv-track"><span style="width:${w}%"></span></span>${gap > 0 ? "+" : ""}${gap.toFixed(1)}%</span>`) + "</div>";
+    });
+    return `<div class="viz lvs"><div class="lv-title"><strong>${inline(title)}</strong> <span class="muted">위는 저항, 아래는 지지 · 막대는 지금 값과의 거리</span></div>${items.join("")}</div>`;
+  },
+  // 이름 | 지금% | 기준(15 또는 50~60) | 이하·이상·목표 | 메모
+  meter(rows) {
+    const ms = rows.filter((r) => r.length >= 3 && numOf(r[1]) !== null).map(([name, v, lim, dir, note]) => {
+      const value = numOf(v);
+      const [lo, hi] = String(lim).split("~").map(numOf);
+      if (lo === null) return "";
+      const top = hi ?? lo;
+      const max = Math.max(value, top) * 1.25 || 1;
+      const p = (n) => Math.min(100, (n / max) * 100).toFixed(1);
+      const ok = dir === "이상" ? value >= lo : dir === "목표" ? value >= lo && value <= top : value <= lo;
+      const band = hi != null ? `<span class="mt-band" style="left:${p(lo)}%;width:${(p(hi) - p(lo)).toFixed(1)}%"></span>` : `<span class="mt-line" style="left:${p(lo)}%"></span>`;
+      return `<div class="mt"><div class="mt-head"><strong>${inline(name)}</strong><span><strong class="${ok ? "mt-ok" : "mt-bad"}">${fmtNum(value)}%</strong> <span class="muted">/ ${esc(lim)}% ${esc(dir || "")}</span></span></div>` +
+        `<div class="mt-track"><span class="mt-fill ${ok ? "ok" : "bad"}" style="width:${p(value)}%"></span>${band}</div>${note ? `<div class="muted mt-note">${inline(note)}</div>` : ""}</div>`;
+    }).filter(Boolean);
+    return ms.length ? `<div class="viz mts">${ms.join("")}</div>` : "";
+  },
+};
+function renderViz(kind, lines) {
+  try {
+    return VIZ[kind](lines.filter((l) => l.trim()).map(splitRow));
+  } catch (e) {
+    return "";
+  }
 }
 
 /* 본문의 "미확인"과 내 종목 이름에 표시를 붙인다 */
