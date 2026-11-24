@@ -367,3 +367,9 @@ body:not(.synced) .sync-only { display: none !important; }
   .pill.act-trim { background: #1b2c48; color: #8fb6ff; }
   .pill.act-wait { background: #3d3214; color: #f1cf6b; }
 }
+/* 표의 등락·손익 숫자: + 빨강, - 파랑 (국내 증권사 관례) */
+td.num-up { color: #d1262a; font-weight: 600; }
+td.num-down { color: #1f5fc7; font-weight: 600; }
+@media (prefers-color-scheme: dark) { td.num-up { color: #ff7b72; } td.num-down { color: #79a8ff; } }
+/* 판단 칸의 긴 문장도 색 배지로 (줄바꿈 허용) */
+.pill.act.act-text { white-space: normal; font-weight: 600; border-radius: 8px; line-height: 1.5; }

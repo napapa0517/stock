@@ -147,6 +147,27 @@ const ACTION_KIND = {
   "매도": "sell", "정리": "sell", "손절": "sell",
   "대기": "wait", "매수대기": "wait", "관망": "wait", "보류": "wait", "재심사": "wait"
 };
+// 판단·액션·판정 칸: [ ] 배지가 없어도 첫 행동 낱말로 색을 입힌다
+const JUDGE_HEAD = /판단|액션|판정|대응/;
+const JUDGE_WORDS = Object.assign({
+  "관찰": "wait", "장기 관찰": "wait", "신규 보류": "wait", "추가 금지": "wait", "추가 중단": "wait",
+  "물타기 금지": "wait", "추가 불가": "wait", "재심사 목록": "wait", "한도 초과": "trim", "축소 검토": "trim"
+}, ACTION_KIND);
+const JUDGE_RE = new RegExp(Object.keys(JUDGE_WORDS).sort((a, b) => b.length - a.length).join("|"));
+// 등락·손익 숫자 칸: + 빨강, - 파랑 (예: -33%, +6.7%, -161.42p (-3.31%), 4,708 (+1.2%))
+const SIGNED_CELL = /^([+\-−])[\d,.]+\s*(%p|%|bp|p|원|달러|배)?$/;
+const SIGNED_PAREN = /^[+\-−]?[\d,.]+\s*\S*\s*\(([+\-−])[\d,.]+\s*%\)$/;
+function tableCell(c, judgeCol) {
+  const html = inline(c);
+  const t = String(c).replace(/\*\*/g, "").trim();
+  const m = t.match(SIGNED_CELL) || t.match(SIGNED_PAREN);
+  if (m) return `<td class="${m[1] === "+" ? "num-up" : "num-down"}">${html}</td>`;
+  if (judgeCol && !html.includes("pill act")) {
+    const w = t.match(JUDGE_RE);
+    if (w) return `<td><span class="pill act act-text act-${JUDGE_WORDS[w[0]]}">${html}</span></td>`;
+  }
+  return `<td>${html}</td>`;
+}
 const ACTION_RE = new RegExp("\\[(" + Object.keys(ACTION_KIND).sort((a, b) => b.length - a.length).join("|") + ")\\](?!\\()", "g");
 function splitRow(line) {
   let l = line.trim();
@@ -181,7 +202,7 @@ function renderMarkdown(md) {
       const body = [];
       while (i < lines.length && lines[i].includes("|") && lines[i].trim() !== "") body.push(splitRow(lines[i++]));
       out.push('<div class="tablewrap"><table><thead><tr>' + head.map((c) => `<th>${inline(c)}</th>`).join("") +
-        "</tr></thead><tbody>" + body.map((r) => "<tr>" + r.map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") +
+        "</tr></thead><tbody>" + body.map((r) => "<tr>" + r.map((c, ci) => tableCell(c, JUDGE_HEAD.test(head[ci] || ""))).join("") + "</tr>").join("") +
         "</tbody></table></div>");
       continue;
     }
