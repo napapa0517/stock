@@ -2,7 +2,7 @@
 // - 화면 파일(html·css·js·아이콘)만 폰에 저장해 두고, 인터넷이 없을 때 그걸로 연다.
 // - 항상 인터넷에서 최신 파일을 먼저 받아 오고, 실패할 때만 저장본을 쓴다.
 // - 구글 시트(Apps Script) 요청이나 다른 사이트 요청은 건드리지 않는다. 자료와 비밀 키는 여기 저장하지 않는다.
-const CACHE = "briefing-shell-v5";
+const CACHE = "briefing-shell-v6";
 const SHELL = [
   "./",
   "index.html",

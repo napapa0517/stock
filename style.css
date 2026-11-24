@@ -354,3 +354,16 @@ body:not(.synced) .sync-only { display: none !important; }
 .st-bar { height: 30px; }
 .st-c0 { background: #3a9d5d; } .st-c1 { background: #2f5bd3; } .st-c2 { background: #8a5cd0; }
 .st-c3 { background: #d99a1e; } .st-c4 { background: #d24b4b; } .st-c5 { background: #6b6862; }
+
+/* 행동 배지 (브리핑 본문의 [매수] [보유] [축소] [매도] [대기]) — 키움 HTS처럼 매수 빨강, 매도 파랑 */
+.pill.act { font-weight: 700; font-size: 12.5px; padding: 2px 10px; }
+.pill.act-buy { background: #e5322d; color: #fff; }
+.pill.act-hold { background: #e3f4e8; color: #1d7a3a; }
+.pill.act-trim { background: #dbe9ff; color: #1f5fc7; }
+.pill.act-sell { background: #1f5fc7; color: #fff; }
+.pill.act-wait { background: #fff3cd; color: #8a6100; }
+@media (prefers-color-scheme: dark) {
+  .pill.act-hold { background: #17351f; color: #7fd69a; }
+  .pill.act-trim { background: #1b2c48; color: #8fb6ff; }
+  .pill.act-wait { background: #3d3214; color: #f1cf6b; }
+}
